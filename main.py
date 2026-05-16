@@ -23,6 +23,9 @@ class Layer_Dense:
     def forward(self, inputs):
         self.output = numpy.dot(inputs, self.weights) + self.biases
 
+def reLU(inputs):
+    return numpy.maximum(0, inputs)
+
 # 2 inputs and 4 neurons
 test_layer = Layer_Dense(2, 4)
 print(test_layer.weights)
