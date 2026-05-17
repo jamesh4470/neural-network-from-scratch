@@ -23,8 +23,20 @@ class Layer_Dense:
     def forward(self, inputs):
         self.output = numpy.dot(inputs, self.weights) + self.biases
 
-def reLU(inputs):
+# used on hidden layers
+def activation_reLU(inputs):
     return numpy.maximum(0, inputs)
+
+# used on the output layer, produces probability distribution
+def activation_softmax(inputs):
+    # for each row, subtract by largest value to prevent exploding values in neurons
+    # shifted results are equivalent to non-shifted results
+    # axis=0, operates down columns and gives result per column
+    # axis=1, operates down rows and gives result per row 
+
+    shifted = inputs - numpy.max(inputs, axis=1, keepdims=True)
+    exponentiated_values = numpy.exp(shifted)
+    return exponentiated_values / numpy.sum(exponentiated_values, axis=1, keepdims=True)
 
 # 2 inputs and 4 neurons
 test_layer = Layer_Dense(2, 4)
