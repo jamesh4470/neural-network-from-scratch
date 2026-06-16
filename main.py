@@ -1,6 +1,6 @@
 import numpy
 
-class Layer_Dense:
+class Dense_Layer:
     def __init__(self, n_inputs, n_neurons):
         # weight's shape: (n_inputs, n_neurons)
         # m = number of inputs (n_inputs)
@@ -21,12 +21,29 @@ class Layer_Dense:
 
     # biases are automatically applied to each row
     def forward(self, inputs):
+        self.inputs = inputs
         self.output = numpy.dot(inputs, self.weights) + self.biases
 
 
+    # outputs are neuron outputs, before reLU
+    def backward(self, dLoss_dOutputs):
+        self.dLoss_dWeights = numpy.dot(self.inputs.T, dLoss_dOutputs) # (n_inputs, n_neurons) 
+        self.dLoss_dBiases = numpy.sum(dLoss_dOutputs, axis=0, keepdims=True) # array (1, n_neurons), one value per neuron
+        self.dLoss_dInputs = numpy.dot(dLoss_dOutputs, self.weights.T) # (samples, n_inputs)
+
+
 # used on hidden layers
-def activation_reLU(inputs):
-    return numpy.maximum(0, inputs)
+class activation_reLU:
+    def forward(self, inputs):
+        self.inputs = inputs
+        self.output = numpy.maximum(0, inputs)
+
+    #outputs are reLU outputs
+    def backward(self, dLoss_dOutputs):
+        # f'(x) = 1 if x > 0
+        # f'(x) = 0 if x < 0
+        self.dLoss_dInputs = dLoss_dOutputs.copy()
+        self.dLoss_dInputs[self.inputs <= 0] = 0
 
 
 # used on the output layer, produces probability distribution
