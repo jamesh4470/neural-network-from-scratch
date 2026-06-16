@@ -38,7 +38,7 @@ class activation_reLU:
         self.inputs = inputs
         self.output = numpy.maximum(0, inputs)
 
-    #outputs are reLU outputs
+    # outputs are reLU outputs
     def backward(self, dLoss_dOutputs):
         # f'(x) = 1 if x > 0
         # f'(x) = 0 if x < 0
@@ -46,29 +46,45 @@ class activation_reLU:
         self.dLoss_dInputs[self.inputs <= 0] = 0
 
 
-# used on the output layer, produces probability distribution
-def activation_softmax(inputs):
-    # for each row, subtract by largest value to prevent exploding values in neurons
-    # shifted results are equivalent to non-shifted results
-    # axis=0, operates down columns and gives result per column
-    # axis=1, operates down rows and gives result per row 
+class softmax_loss:
+    # used on the output layer, produces probability distribution
+    def _activation_softmax(self, inputs):
+        # for each row, subtract by largest value to prevent exploding values in neurons
+        # shifted results are equivalent to non-shifted results
+        # axis=0, operates down columns and gives result per column
+        # axis=1, operates down rows and gives result per row 
 
-    shifted = inputs - numpy.max(inputs, axis=1, keepdims=True)
-    exponentiated_values = numpy.exp(shifted)
-    return exponentiated_values / numpy.sum(exponentiated_values, axis=1, keepdims=True)
+        shifted = inputs - numpy.max(inputs, axis=1, keepdims=True)
+        exponentiated_values = numpy.exp(shifted)
+        return exponentiated_values / numpy.sum(exponentiated_values, axis=1, keepdims=True)
+
+
+    # one hot
+    def _loss(self, softmax_outputs, class_targets):
+        softmax_outputs = numpy.clip(softmax_outputs, 1e-7, 1 - 1e-7) # prevents log(0)
+        true_class_probability = numpy.sum(softmax_outputs * class_targets, axis=1)
+        loss = -numpy.log(true_class_probability)
+        average_loss = numpy.mean(loss)
+        return average_loss
+
+
+    def forward(self, inputs, class_targets):
+        return self._loss(self._activation_softmax(inputs), class_targets)
+
+
+    # dLoss_dInputs = y_predicted - y_true
+    # equivalent to subtracting 1 at the correct class position
+    def backward(self, y_predicted, y_true):
+        y_true = numpy.argmax(y_true, axis=1) # convert one hot to label format
+        self.dLoss_dInputs = y_predicted.copy()
+        self.dLoss_dInputs[range(len(y_predicted)), y_true] -= 1 # subtracts one at correct class position
+        # normalize gradient
+        self.dLoss_dInputs = self.dLoss_dInputs / len(y_predicted)
 
 
 def loss_label(softmax_outputs, class_targets):
     softmax_outputs = numpy.clip(softmax_outputs, 1e-7, 1 - 1e-7) # prevents log(0)
     greatest_confidences = softmax_outputs[range(len(softmax_outputs)), class_targets]
-    loss = -numpy.log(greatest_confidences)
-    average_loss = numpy.mean(loss)
-    return loss
-
-
-def loss_one_hot(softmax_outputs, class_targets):
-    softmax_outputs = numpy.clip(softmax_outputs, 1e-7, 1 - 1e-7) # prevents log(0)
-    greatest_confidences = numpy.sum(softmax_outputs * class_targets, axis=1)
     loss = -numpy.log(greatest_confidences)
     average_loss = numpy.mean(loss)
     return loss
@@ -87,7 +103,7 @@ def accuracy(softmax_outputs, class_targets):
 
 
 # 2 inputs and 4 neurons
-test_layer = Layer_Dense(2, 4)
+test_layer = Dense_Layer(2, 4)
 print(test_layer.weights)
 print(test_layer.biases)
 
