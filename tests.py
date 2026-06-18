@@ -19,7 +19,7 @@ def visualize_data():
     for i in range(10):
         print(y_train[i])
         print(y_train_onehot[i])
-        img_data = X_train[i].reshape(28, 28)
+        img_data = x_train[i].reshape(28, 28)
         matplotlib.pyplot.imshow(img_data)
         matplotlib.pyplot.show()
 

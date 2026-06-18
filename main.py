@@ -1,5 +1,6 @@
 import numpy
 from fashion_mnist.utils import mnist_reader
+import random
 import matplotlib.pyplot
 import time
 
@@ -155,8 +156,8 @@ def accuracy(softmax_outputs, class_targets):
     return numpy.mean(predictions == class_targets)
 
 
-X_train, y_train = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='train')
-X_test, y_test = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='t10k')
+x_train, y_train = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='train')
+x_test, y_test = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='t10k')
 y_train_onehot = numpy.eye(10)[y_train]
 y_test_onehot = numpy.eye(10)[y_test]
 
@@ -172,16 +173,22 @@ layer_three = Dense_Layer(64, 10)
 softmax_loss = Softmax_Loss()
 optimizer = Optimizer_Adam(learning_rate_decay_rate=5e-5)
 
+epochs = 20
 batch_size = 100
+final_training_accuracy = 0
 
-for epoch in range(10):
+for epoch in range(epochs):
     total_epoch_loss = 0
     total_epoch_accuracy = 0
     current_batch = 0
-
-    for starting_index in range(0, len(X_train), batch_size):
-        x = X_train[starting_index:(starting_index + batch_size)]
-        y = y_train_onehot[starting_index:(starting_index + batch_size)]
+    
+    permutation = numpy.random.permutation(len(x_train))
+    x_train_random = x_train[permutation]
+    y_train_onehot_random = y_train_onehot[permutation]
+    
+    for starting_index in range(0, len(x_train_random), batch_size):
+        x = x_train_random[starting_index:(starting_index + batch_size)]
+        y = y_train_onehot_random[starting_index:(starting_index + batch_size)]
 
         layer_one.forward(x)
         relu_one.forward(layer_one.output)
@@ -209,4 +216,52 @@ for epoch in range(10):
         optimizer.update_parameters(layer_one)
         optimizer.increment_iterations()
 
-    print(f"Epoch: {epoch}, Loss: {total_epoch_loss / current_batch}, Accuracy: {total_epoch_accuracy / current_batch}")
+    print(f"Epoch: {epoch}, Loss: {(total_epoch_loss / current_batch):.3f}, Accuracy: {(total_epoch_accuracy / current_batch):.3f}")
+
+    if epoch == epochs - 1:
+        final_training_accuracy = total_epoch_accuracy / current_batch
+
+print("Training complete, now categorizing test data")
+
+layer_one.forward(x_test)
+relu_one.forward(layer_one.output)
+layer_two.forward(relu_one.output)
+relu_two.forward(layer_two.output)
+layer_three.forward(relu_two.output)
+
+softmax_loss.forward(layer_three.output, y_test_onehot)
+softmax_output = softmax_loss.activation_softmax(layer_three.output)
+print(f"Test data: Loss: {(softmax_loss.output):.3f}, Accuracy: {(accuracy(softmax_output, y_test_onehot)):.3f}")
+
+print("Test data evaluation complete")
+print(f"Difference in accuracy: {(abs(accuracy(softmax_output, y_test_onehot) - final_training_accuracy) * 100):.3f}%")
+print("Now categorizing & visualizing random test samples")
+
+# classify 3 random samples
+for _ in range(3):
+    current_sample_index = random.randrange(len(x_test))
+    x = x_test[current_sample_index]
+    y = y_test_onehot[current_sample_index]
+
+    layer_one.forward(x)
+    relu_one.forward(layer_one.output)
+    layer_two.forward(relu_one.output)
+    relu_two.forward(layer_two.output)
+    layer_three.forward(relu_two.output)
+    softmax_loss.forward(layer_three.output, y_test_onehot)
+    softmax_output = softmax_loss.activation_softmax(layer_three.output)
+    
+    expected_classification = numpy.argmax(softmax_output) # flattens out 2d arrays by default anyway
+    actual_classification = y_test[current_sample_index]
+
+    class_names = [
+        "T-shirt/Top", "Trouser", "Pullover", "Dress", "Coat",
+        "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot",
+    ]
+
+    print("\n")
+    print(f"Expected_classification: {class_names[expected_classification]}")
+    print(f"Actual classification: {class_names[actual_classification]}")   
+
+    matplotlib.pyplot.imshow(x.reshape(28, 28))
+    matplotlib.pyplot.show()
