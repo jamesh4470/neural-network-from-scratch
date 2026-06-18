@@ -33,7 +33,7 @@ class Dense_Layer:
 
 
 # used on hidden layers
-class activation_reLU:
+class Activation_ReLU:
     def forward(self, inputs):
         self.inputs = inputs
         self.output = numpy.maximum(0, inputs)
@@ -46,7 +46,7 @@ class activation_reLU:
         self.dLoss_dInputs[self.inputs <= 0] = 0
 
 
-class softmax_loss:
+class Softmax_Loss:
     # used on the output layer, produces probability distribution
     def _activation_softmax(self, inputs):
         # for each row, subtract by largest value to prevent exploding values in neurons
@@ -80,6 +80,54 @@ class softmax_loss:
         self.dLoss_dInputs[range(len(y_predicted)), y_true] -= 1 # subtracts one at correct class position
         # normalize gradient
         self.dLoss_dInputs = self.dLoss_dInputs / len(y_predicted)
+
+
+class Optimizer_Adam:
+    def __init__(self, learning_rate=0.001, learning_rate_decay_rate=0, epsilon=1e-7, beta_1=0.9, beta_2=0.999):
+        self.learning_rate = learning_rate
+        self.learning_rate_decay_rate = learning_rate_decay_rate 
+        self.epsilon = epsilon
+        self.beta_1 = beta_1
+        self.beta_2 = beta_2
+
+        self.iterations = 0
+        self.current_learning_rate = learning_rate
+
+
+    # call before update_parameters()
+    def learning_rate_decay(self):
+        self.current_learning_rate = self.learning_rate * (1 / (1 + self.learning_rate_decay_rate * self.iterations))
+
+
+    # momentum is the average of the signed gradients
+    # cache is the average of squared gradients
+    def update_parameters(self, layer):
+        if not hasattr(layer, "weight_cache"):
+            layer.weight_momentums = numpy.zeros_like(layer.weights)
+            layer.weight_cache = numpy.zeros_like(layer.weights)
+            layer.bias_momentums= numpy.zeros_like(layer.biases)
+            layer.bias_cache = numpy.zeros_like(layer.biases)
+
+        layer.weight_momentums = (self.beta_1 * layer.weight_momentums) + ((1 - self.beta_1) * layer.dLoss_dWeights)
+        layer.bias_momentums = (self.beta_1 * layer.bias_momentums) + ((1 - self.beta_1) * layer.dLoss_dBiases)
+
+        weight_momentums_corrected = layer.weight_momentums / (1 - self.beta_1**(self.iterations + 1))
+        bias_momentums_corrected = layer.bias_momentums / (1 - self.beta_1**(self.iterations + 1))
+
+        layer.weight_cache = (self.beta_2 * layer.weight_cache) + ((1 - self.beta_2) * layer.dLoss_dWeights**2)
+        layer.bias_cache = (self.beta_2 * layer.bias_cache) + ((1 - self.beta_2) * layer.dLoss_dBiases**2)
+
+        weight_cache_corrected = layer.weight_cache / (1 - self.beta_2**(self.iterations + 1))
+        bias_cache_corrected = layer.bias_cache / (1 - self.beta_2**(self.iterations + 1))
+
+        # square root cache for r.m.s values
+        layer.weights += -self.current_learning_rate * (weight_momentums_corrected / (numpy.sqrt(weight_cache_corrected) + self.epsilon))
+        layer.biases += -self.current_learning_rate * (bias_momentums_corrected / (numpy.sqrt(bias_cache_corrected) + self.epsilon))
+
+
+    # call after update_parameters()
+    def increment_iterations(self):
+        self.iterations += 1
 
 
 def loss_label(softmax_outputs, class_targets):
