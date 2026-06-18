@@ -1,4 +1,9 @@
 import numpy
+from fashion_mnist.utils import mnist_reader
+import matplotlib.pyplot
+import time
+
+matplotlib.use("TkAgg")
 
 class Dense_Layer:
     def __init__(self, n_inputs, n_neurons):
@@ -48,7 +53,7 @@ class Activation_ReLU:
 
 class Softmax_Loss:
     # used on the output layer, produces probability distribution
-    def _activation_softmax(self, inputs):
+    def activation_softmax(self, inputs):
         # for each row, subtract by largest value to prevent exploding values in neurons
         # shifted results are equivalent to non-shifted results
         # axis=0, operates down columns and gives result per column
@@ -60,7 +65,7 @@ class Softmax_Loss:
 
 
     # one hot
-    def _loss(self, softmax_outputs, class_targets):
+    def loss(self, softmax_outputs, class_targets):
         softmax_outputs = numpy.clip(softmax_outputs, 1e-7, 1 - 1e-7) # prevents log(0)
         true_class_probability = numpy.sum(softmax_outputs * class_targets, axis=1)
         loss = -numpy.log(true_class_probability)
@@ -69,7 +74,7 @@ class Softmax_Loss:
 
 
     def forward(self, inputs, class_targets):
-        return self._loss(self._activation_softmax(inputs), class_targets)
+        return self.loss(self.activation_softmax(inputs), class_targets)
 
 
     # dLoss_dInputs = y_predicted - y_true
@@ -83,12 +88,12 @@ class Softmax_Loss:
 
 
 class Optimizer_Adam:
-    def __init__(self, learning_rate=0.001, learning_rate_decay_rate=0, epsilon=1e-7, beta_1=0.9, beta_2=0.999):
+    def __init__(self, learning_rate=0.001, learning_rate_decay_rate=0.0, beta_1=0.9, beta_2=0.999, epsilon=1e-7):
         self.learning_rate = learning_rate
         self.learning_rate_decay_rate = learning_rate_decay_rate 
-        self.epsilon = epsilon
         self.beta_1 = beta_1
         self.beta_2 = beta_2
+        self.epsilon = epsilon
 
         self.iterations = 0
         self.current_learning_rate = learning_rate
@@ -150,14 +155,29 @@ def accuracy(softmax_outputs, class_targets):
     return numpy.mean(predictions == class_targets)
 
 
-# 2 inputs and 4 neurons
-test_layer = Dense_Layer(2, 4)
-print(test_layer.weights)
-print(test_layer.biases)
+X_train, y_train = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='train')
+X_test, y_test = mnist_reader.load_mnist('fashion_mnist/data/fashion', kind='t10k')
+y_train_onehot = numpy.eye(10)[y_train]
+y_test_onehot = numpy.eye(10)[y_test]
 
-test_softmax_output = numpy.array([[0.2, 0.2, 0.6], # class 3 greatest
-                       [0.1, 0.8, 0.1], # class 2 greatest 
-                       [0.5, 0.4, 0.1]]) # class 1 greatest
-test_class_target = numpy.array([2, 1, 0])
+# two hidden layers
+layer_one = Dense_Layer(784, 64)
+layer_two = Dense_Layer(64, 64)
+layer_three = Dense_Layer(64, 10)
+relu = Activation_ReLU()
+softmax_loss = Softmax_Loss()
+adam = Optimizer_Adam(learning_rate_decay_rate=5e-5)
 
-print(accuracy(test_softmax_output, test_class_target))
+for epoch in range(len(X_train)):
+    x = X_train[epoch]
+    y = y_train_onehot[epoch]
+
+    layer_one_output = relu.forward(layer_one.forward(x))
+    layer_two_output = relu.forward(layer_one_output)
+
+    softmax_output = softmax_loss.activation_softmax(layer_two_output)
+    loss = softmax_loss.forward(layer_two_output, y)
+
+    print(f"Epoch: {epoch}, Loss: {loss}, Accuracy: {accuracy(softmax_output, y)}")
+
+    softmax_loss.backward(softmax_output, y)   
