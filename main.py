@@ -74,7 +74,7 @@ class Softmax_Loss:
 
 
     def forward(self, inputs, class_targets):
-        return self.loss(self.activation_softmax(inputs), class_targets)
+        self.output = self.loss(self.activation_softmax(inputs), class_targets)
 
 
     # dLoss_dInputs = y_predicted - y_true
@@ -140,7 +140,7 @@ def loss_label(softmax_outputs, class_targets):
     greatest_confidences = softmax_outputs[range(len(softmax_outputs)), class_targets]
     loss = -numpy.log(greatest_confidences)
     average_loss = numpy.mean(loss)
-    return loss
+    return average_loss
 
 
 # how often the largest confidence is the correct class 
@@ -162,22 +162,51 @@ y_test_onehot = numpy.eye(10)[y_test]
 
 # two hidden layers
 layer_one = Dense_Layer(784, 64)
+relu_one = Activation_ReLU()
+
 layer_two = Dense_Layer(64, 64)
+relu_two = Activation_ReLU()
+
 layer_three = Dense_Layer(64, 10)
-relu = Activation_ReLU()
+
 softmax_loss = Softmax_Loss()
-adam = Optimizer_Adam(learning_rate_decay_rate=5e-5)
+optimizer = Optimizer_Adam(learning_rate_decay_rate=5e-5)
 
-for epoch in range(len(X_train)):
-    x = X_train[epoch]
-    y = y_train_onehot[epoch]
+batch_size = 100
 
-    layer_one_output = relu.forward(layer_one.forward(x))
-    layer_two_output = relu.forward(layer_one_output)
+for epoch in range(10):
+    total_epoch_loss = 0
+    total_epoch_accuracy = 0
+    current_batch = 0
 
-    softmax_output = softmax_loss.activation_softmax(layer_two_output)
-    loss = softmax_loss.forward(layer_two_output, y)
+    for starting_index in range(0, len(X_train), batch_size):
+        x = X_train[starting_index:(starting_index + batch_size)]
+        y = y_train_onehot[starting_index:(starting_index + batch_size)]
 
-    print(f"Epoch: {epoch}, Loss: {loss}, Accuracy: {accuracy(softmax_output, y)}")
+        layer_one.forward(x)
+        relu_one.forward(layer_one.output)
+        layer_two.forward(relu_one.output)
+        relu_two.forward(layer_two.output)
+        layer_three.forward(relu_two.output)
 
-    softmax_loss.backward(softmax_output, y)   
+        softmax_loss.forward(layer_three.output, y)
+        softmax_output = softmax_loss.activation_softmax(layer_three.output)
+
+        total_epoch_loss += softmax_loss.output
+        total_epoch_accuracy += accuracy(softmax_output, y)
+        current_batch += 1
+
+        softmax_loss.backward(softmax_output, y)
+        layer_three.backward(softmax_loss.dLoss_dInputs)
+        relu_two.backward(layer_three.dLoss_dInputs)
+        layer_two.backward(relu_two.dLoss_dInputs)
+        relu_one.backward(layer_two.dLoss_dInputs)
+        layer_one.backward(relu_one.dLoss_dInputs)
+
+        optimizer.learning_rate_decay()
+        optimizer.update_parameters(layer_three)
+        optimizer.update_parameters(layer_two)
+        optimizer.update_parameters(layer_one)
+        optimizer.increment_iterations()
+
+    print(f"Epoch: {epoch}, Loss: {total_epoch_loss / current_batch}, Accuracy: {total_epoch_accuracy / current_batch}")
